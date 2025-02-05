@@ -1,0 +1,45 @@
+name: Update Data
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y curl pup
+
+      - name: Download and extract country names
+        run: |
+          # Fetch the page content
+          curl -s "https://www.open-epg.com/app/index.php" -o page.html
+
+          # Extract country names (Modify selector as needed)
+          cat page.html | pup 'selector-for-countries text{}' > countries.txt
+
+      - name: Download and extract XML data
+        run: |
+          # Extract XML URLs (Modify selector as needed)
+          cat page.html | pup 'selector-for-xml-links attr{href}' > xml_urls.txt
+
+          # Download XML data
+          echo "" > xml_data.txt
+          while read url; do
+            curl -s "$url" >> xml_data.txt
+            echo "" >> xml_data.txt
+          done < xml_urls.txt
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add countries.txt xml_data.txt
+          git commit -m "Update countries and XML data" || echo "No changes to commit"
+          git push --force origin main
