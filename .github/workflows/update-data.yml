@@ -1,4 +1,4 @@
-name: Update Data
+name: Update Channels by Country
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
-  update-data:
+  update-channels:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,32 +14,32 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get install -y curl pup
-
-      - name: Download and extract country names
         run: |
-          # Fetch the page content
-          curl -s "https://www.open-epg.com/app/index.php" -o page.html
+          sudo apt-get update
+          sudo apt-get install -y wget pup
 
-          # Extract country names (Modify selector as needed)
+      - name: Download the webpage using wget
+        run: |
+          wget -q "https://www.open-epg.com/app/index.php" -O page.html
+
+      - name: Extract country names and channel data
+        run: |
+          # Extract country names (modify selector as needed)
           cat page.html | pup 'selector-for-countries text{}' > countries.txt
 
-      - name: Download and extract XML data
-        run: |
-          # Extract XML URLs (Modify selector as needed)
-          cat page.html | pup 'selector-for-xml-links attr{href}' > xml_urls.txt
-
-          # Download XML data
-          echo "" > xml_data.txt
-          while read url; do
-            curl -s "$url" >> xml_data.txt
-            echo "" >> xml_data.txt
-          done < xml_urls.txt
+          # Extract channels per country and save to their own files
+          while read country; do
+            echo "Extracting channels for $country"
+            echo "=== $country ===" > "$country.txt"
+            # Extract channels for this country (modify selector as needed)
+            cat page.html | pup "selector-for-channels text{}" >> "$country.txt"
+            echo "" >> "$country.txt"
+          done < countries.txt
 
       - name: Commit and push changes
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add countries.txt xml_data.txt
-          git commit -m "Update countries and XML data" || echo "No changes to commit"
+          git add *.txt
+          git commit -m "Update channel data by country" || echo "No changes to commit"
           git push --force origin main
